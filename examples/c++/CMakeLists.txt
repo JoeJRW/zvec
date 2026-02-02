@@ -8,11 +8,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # --- Paths to Zvec and dependencies ---
 set(ZVEC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/../../../src/include)
+set(ZVEC_SRC_DIR ${CMAKE_BINARY_DIR}/../../../src)
 set(ZVEC_LIB_DIR ${CMAKE_BINARY_DIR}/../../../build/lib)
 set(ZVEC_DEPENDENCY_LIB_DIR ${CMAKE_BINARY_DIR}/../../../build/external/usr/local/lib)
 
 # Add include and library search paths
-include_directories(${ZVEC_INCLUDE_DIR})
+# ZVEC_SRC_DIR is needed for headers like <ailego/math_batch/utils.h>
+include_directories(${ZVEC_INCLUDE_DIR} ${ZVEC_SRC_DIR})
 link_directories(${ZVEC_LIB_DIR} ${ZVEC_DEPENDENCY_LIB_DIR})
 
 # --- Determine debug/release library names ---
@@ -26,26 +28,41 @@ else()
     set(PROTOBUF_LIB protobuf)
 endif()
 
+# --- System libraries ---
+find_package(Threads REQUIRED)
+set(SYSTEM_LIBS
+    Threads::Threads
+    ${CMAKE_DL_LIBS}
+)
+
 # --- Dependency groups ---
+# Use linker group to handle circular dependencies between arrow and parquet
 set(zvec_ailego_deps
+    -Wl,--start-group
     arrow
+    arrow_compute
     parquet
     arrow_bundled_dependencies
+    -Wl,--end-group
+    ${SYSTEM_LIBS}
 )
 
 set(zvec_core_deps
     # empty
 )
 
+# Use linker group to handle circular dependencies in static libraries
 set(zvec_db_deps
     roaring
     rocksdb
+    -Wl,--start-group
     arrow
     arrow_acero
-    arrow_bundled_dependencies
     arrow_compute
     arrow_dataset
     parquet
+    arrow_bundled_dependencies
+    -Wl,--end-group
     antlr4-runtime
     ${GLOG_LIB}
     ${GFLAGS_LIB}
@@ -66,13 +83,15 @@ target_link_libraries(zvec-ailego INTERFACE
 add_library(zvec-core INTERFACE)
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(zvec-core INTERFACE
-        "-Wl,--whole-archive,${ZVEC_LIB_DIR}/libzvec_core.a,-Wl,--no-whole-archive"
+        -Wl,--whole-archive
+        ${ZVEC_LIB_DIR}/libzvec_core.a
+        -Wl,--no-whole-archive
         zvec-ailego
         ${zvec_core_deps}
     )
 elseif(APPLE)
     target_link_libraries(zvec-core INTERFACE
-        "-Wl,-force_load,${ZVEC_LIB_DIR}/libzvec_core.a"
+        -Wl,-force_load,${ZVEC_LIB_DIR}/libzvec_core.a
         zvec-ailego
         ${zvec_core_deps}
     )
