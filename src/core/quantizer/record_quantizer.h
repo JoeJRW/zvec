@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <math.h>
+#include <iostream>
 #include <zvec/core/framework/index_meta.h>
 
 #pragma once
@@ -43,6 +45,7 @@ class RecordQuantizer {
       if (type == IndexMeta::DataType::DT_INT8) {
         scale = 254 / std::max(max - min, epsilon);
         bias = -min * scale - 127;
+        std::cout << "scale " << scale << " bias " << bias << std::endl;
         for (size_t i = 0; i < dim; ++i) {
           float v = vec[i] * scale + bias;
           squared_sum += v * v;
@@ -50,6 +53,10 @@ class RecordQuantizer {
           (reinterpret_cast<int8_t *>(out))[i] =
               static_cast<int8_t>(std::round(v));
           int8_sum += (reinterpret_cast<int8_t *>(out))[i];
+          std::cout << "origin float dims " << i << ": " << vec[i]
+                    << ", quant float: " << v << ", stored: "
+                    << static_cast<int>((reinterpret_cast<int8_t *>(out))[i])
+                    << std::endl;
         }
         extras = reinterpret_cast<float *>(static_cast<int8_t *>(out) + dim);
       } else {
@@ -79,6 +86,12 @@ class RecordQuantizer {
       } else {
         reinterpret_cast<int *>(extras)[3] = int8_sum;
       }
+      std::cout << "extras[0] " << extras[0] << " extras[1] " << extras[1]
+                << " extras[2] " << extras[2] << " extras[3] "
+                << (is_euclidean ? extras[3]
+                                 : static_cast<float>(
+                                       reinterpret_cast<int *>(extras)[3]))
+                << std::endl;
     }
   }
 

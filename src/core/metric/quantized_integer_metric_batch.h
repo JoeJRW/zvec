@@ -17,6 +17,7 @@
 #include <ailego/math/norm2_matrix.h>
 #include <ailego/math_batch/distance_batch.h>
 #include "quantized_integer_metric_matrix.h"
+#include <iostream>
 
 namespace zvec::core {
 
@@ -133,10 +134,16 @@ struct MinusInnerProductDistanceBatchWithScoreUnquantized<int8_t, BatchSize,
       float mb = m_tail[1];
       float ms = m_tail[2];
       float &result = results[i];
+      float ip = result;
       if (ImplType::GetQueryPreprocessFunc() != nullptr) {
         int int_sum = reinterpret_cast<const int *>(m_tail)[3];
         result -= 128 * int_sum;
       }
+      std::cout << "ip: " << ip << "ip fixed: " << result << std::endl;
+      float rt = -(ma * qa * result + mb * qa * qs + qb * ma * ms +
+                 original_dim * qb * mb);
+      std::cout << "ma " << ma << " mb " << mb << " ms " << ms << " qa " << qa
+                << " qb " << qb << " qs " << qs << " rt " << rt << std::endl;
       result = -(ma * qa * result + mb * qa * qs + qb * ma * ms +
                  original_dim * qb * mb);
     }
